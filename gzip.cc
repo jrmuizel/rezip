@@ -32,11 +32,65 @@ uint32_t get_uint32()
 	return get_byte() | (get_byte()<<8) | (get_byte()<<16) | (get_byte()<<24);
 }
 
+struct huff_node
+{
+	int length;
+	int code;
+};
+
+void build_huff(struct huff_node tree[], int code_length_count, int max_length)
+{
+	int bl_count[max_length+1];
+	int next_code[max_length+1];
+	for (int i=0; i<max_length; i++) {
+		bl_count[i] = 0;
+	}
+	for (int i=0; i<code_length_count; i++) {
+		bl_count[tree[i].length]++;
+	}
+	int code = 0;
+	bl_count[0] = 0;
+	for (int bits = 1; bits <= max_length; bits++) {
+		code = (code + bl_count[bits-1]) << 1;
+		next_code[bits] = code;
+	}
+
+	int max_code = code_length_count-1;
+	for (int n=0; n <= max_code; n++) {
+		int len = tree[n].length;
+		if (len != 0) {
+			tree[n].code = next_code[len];
+			next_code[len]++;
+		}
+	}
+
+}
+
+void read_dynamic_huffman()
+{
+	int literal_length_code_count = get_bits(5) + 257;
+	int distance_code_count = get_bits(5) + 1;
+	int code_length_code_count = get_bits(4) + 4;
+	int code_length_codes[19] = {};
+	int code_length_code_order[19] = {
+		16, 17, 18,
+		0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
+	printf("dh %d %d %d\n", literal_length_code_count, distance_code_count, code_length_code_count);
+	for (int i=0; i<code_length_code_count; i++) {
+		code_length_codes[code_length_code_order[i]] = get_bits(3);
+		printf("%d -> %d\n", code_length_code_order[i], code_length_codes[code_length_code_order[i]]);
+	}
+
+	struct huff_node example_lengths[] = {{3},{3},{3},{3},{3},{2},{4},{4}};
+	build_huff(example_lengths, 8, 4);
+}
 void read_deflate()
 {
 	bool bfinal = get_bits(1);
 	uint8_t btype = get_bits(2);
 	printf("%x %x\n", bfinal, btype);
+	if (btype == 2)
+		read_dynamic_huffman();
 }
 
 int main(int argc, char **argv)

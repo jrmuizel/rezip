@@ -1,2 +1,2 @@
-CXXFLAGS=-Wall
+CXXFLAGS=-Wall -g
 gzip:
