@@ -53,6 +53,7 @@ void build_huff(struct huff_node tree[], int code_length_count, int max_length)
 	for (int bits = 1; bits <= max_length; bits++) {
 		code = (code + bl_count[bits-1]) << 1;
 		next_code[bits] = code;
+		printf("length: %d next_code: %x\n", bits, code);
 	}
 
 	int max_code = code_length_count-1;
@@ -62,27 +63,203 @@ void build_huff(struct huff_node tree[], int code_length_count, int max_length)
 			tree[n].code = next_code[len];
 			next_code[len]++;
 		}
+		printf("%d %d %x\n", n, tree[n].length, tree[n].code);
 	}
 
 }
 
+int read_huff(struct huff_node tree[], int N)
+{
+	//XXX: fix this
+	int last_min = 0;
+	int candidate = 0;
+	while (1) {
+		int min_length = 10000000;
+		for (int i=0; i<N; i++) {
+			if (tree[i].length > last_min && tree[i].length < min_length) {
+				min_length = tree[i].length;
+			}
+		}
+		//printf("min_length: %d\n", min_length);
+		for (int i=0; i<(min_length - last_min); i++) {
+			candidate <<= 1;
+			candidate |= get_bits(1);
+		}
+		//printf("candidate: %x\n", candidate);
+		for (int i=0; i<N; i++) {
+			if (candidate == tree[i].code && min_length == tree[i].length) {
+				//printf("code_val: %x\n", candidate);
+				return i;
+			}
+		}
+		last_min = min_length;
+	}
+}
+
+void read_length_codes(struct huff_node code_length_codes[], struct huff_node length_codes[], int count)
+{
+	for (int i=0; i<count; i++) {
+		int code = read_huff(code_length_codes, 19);
+		if (code == 17) {
+			int length = get_bits(3) + 3;
+			printf("0 repeat: %d\n", length);
+			for (int j=0; j<length; j++) {
+				length_codes[i+j].length = 0;
+				length_codes[i+j].code = 0;
+			}
+			i+=length-1;
+		} else if (code == 18) {
+			int length = get_bits(7) + 11;
+			printf("0 repeat: %d\n", length);
+			for (int j=0; j<length; j++) {
+				length_codes[i+j].length = 0;
+				length_codes[i+j].code = 0;
+			}
+			i+=length-1;
+		} else if (code == 16) {
+			int length = get_bits(2) + 3;
+			printf("%d repeat: %d\n", length_codes[i-1].length, length);
+			for (int j=0; j<length; j++) {
+				length_codes[i+j].length = length_codes[i-1].length;
+				length_codes[i+j].code = 0;
+			}
+			i+=length-1;
+		} else {
+			length_codes[i].length = code;
+			length_codes[i].code = 0;
+			printf("lit: %d[%c] %d\n", i, i, code);
+		}
+	}
+
+}
 void read_dynamic_huffman()
 {
 	int literal_length_code_count = get_bits(5) + 257;
 	int distance_code_count = get_bits(5) + 1;
 	int code_length_code_count = get_bits(4) + 4;
-	int code_length_codes[19] = {};
+	struct huff_node code_length_codes[19] = {};
 	int code_length_code_order[19] = {
 		16, 17, 18,
 		0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
 	printf("dh %d %d %d\n", literal_length_code_count, distance_code_count, code_length_code_count);
 	for (int i=0; i<code_length_code_count; i++) {
-		code_length_codes[code_length_code_order[i]] = get_bits(3);
-		printf("%d -> %d\n", code_length_code_order[i], code_length_codes[code_length_code_order[i]]);
+		code_length_codes[code_length_code_order[i]].length = get_bits(3);
+		printf("%d -> %d\n", code_length_code_order[i], code_length_codes[code_length_code_order[i]].length);
 	}
+	build_huff(code_length_codes, 19, 7);
 
-	struct huff_node example_lengths[] = {{3},{3},{3},{3},{3},{2},{4},{4}};
-	build_huff(example_lengths, 8, 4);
+	printf("position %d\n", bit_position);
+	struct huff_node literal_length_codes[literal_length_code_count];
+	read_length_codes(code_length_codes, literal_length_codes, literal_length_code_count);
+	//XXX: get real max
+	build_huff(literal_length_codes, literal_length_code_count, 55);
+
+	struct huff_node distance_codes[distance_code_count];
+	read_length_codes(code_length_codes, distance_codes, distance_code_count);
+	build_huff(distance_codes, distance_code_count, 55);
+
+	char buf[1000];
+	int buf_index = 0;
+	while (1) {
+	int code = read_huff(literal_length_codes, literal_length_code_count);
+	{
+		int extra_length_bits[] = {
+			0, //257
+			0, //258
+			0, //259
+			0, //260
+			0, //261
+			0, //263
+			0, //264
+			1, //265
+			1, //266
+			1, //267
+			1, //268
+			2, //269
+			2, //270
+			2, //271
+			2, //272
+			3, //273
+			3, //274
+			3, //275
+			3, //276
+			4, //277
+			4, //278
+			4, //279
+			4, //280
+			5, //281
+			5, //282
+			5, //283
+			5, //284
+			0, //285
+		};
+		int extra_distance_bits[] = {
+			0,
+				0,
+				0,
+				0,
+				1,
+				1,
+				2,
+				2,
+				3,
+				3,
+				4,
+				4,
+				5,
+				5,
+				6,
+				6,
+				7,
+				7,
+				8,
+				8,
+				9,
+				9,
+				10,
+				10,
+				11,
+				11,
+				12,
+				12,
+				13,
+				13};
+		if (code < 256) {
+			printf("%c", code);
+			buf[buf_index++] = code;
+		}
+		else if (code == 256)
+			break;
+		else {
+			int lengths[] = {3,4,5,6,7,8,9,10,11,13,
+				15,17,19,23,27,31,35,43,51,59,
+				67,83,99,115,131,163,195,227,258};
+			int distance[] = {1,2,3,4,5,7,9,13,17,25,
+				33,49,65,97,129,193,257,385,513,
+				769,1025,1537,2049,3073,4097,6145,
+				8193,12289,16384,24577};
+			int extra_length = get_bits(extra_length_bits[code-257]);
+			int distance_code = read_huff(distance_codes, distance_code_count);
+			int extra_distance = get_bits(extra_distance_bits[distance_code]);
+			//printf("length code: %d extra: %d:%d distance: %d extra:%d\n",
+			//       code, extra_length,
+			//       distance_code, extra_distance);
+			//printf("match %d %d\n", lengths[code-257] + extra_length,
+			//       distance[distance_code] + extra_distance);
+			int l = lengths[code-257] + extra_length;
+			int d = distance[distance_code] + extra_distance;
+			for (int i=0; i<l; i++) {
+				char c = buf[buf_index-d];
+				buf[buf_index++] = c;
+				printf("%c",c);
+			}
+
+
+		}
+	}
+	}
+	//struct huff_node example_lengths[] = {{3},{3},{3},{3},{3},{2},{4},{4}};
+	//build_huff(example_lengths, 8, 4);
 }
 void read_deflate()
 {
