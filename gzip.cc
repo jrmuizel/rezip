@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+FILE *df;
+
 unsigned bit_position;
 unsigned char *buf;
 
@@ -95,13 +97,22 @@ int read_huff(struct huff_node tree[], int N)
 		last_min = min_length;
 	}
 }
+void write_byte(uint8_t a)
+{
+	fwrite(&a, 1, 1, df);
+}
 
+
+// the maximum length out of this is 15. The maximum huffcode is 18 We'll need to encode each of these as a byte
+// instead of a nibble (plus an additional byte for the extra bits)
 void read_length_codes(struct huff_node code_length_codes[], struct huff_node length_codes[], int count)
 {
 	for (int i=0; i<count; i++) {
 		int code = read_huff(code_length_codes, 19);
+		write_byte(code);
 		if (code == 17) {
 			int length = get_bits(3) + 3;
+			write_byte(length-3);
 			printf("0 repeat: %d\n", length);
 			for (int j=0; j<length; j++) {
 				length_codes[i+j].length = 0;
@@ -110,6 +121,7 @@ void read_length_codes(struct huff_node code_length_codes[], struct huff_node le
 			i+=length-1;
 		} else if (code == 18) {
 			int length = get_bits(7) + 11;
+			write_byte(length-11);
 			printf("0 repeat: %d\n", length);
 			for (int j=0; j<length; j++) {
 				length_codes[i+j].length = 0;
@@ -118,6 +130,7 @@ void read_length_codes(struct huff_node code_length_codes[], struct huff_node le
 			i+=length-1;
 		} else if (code == 16) {
 			int length = get_bits(2) + 3;
+			write_byte(length-3);
 			printf("%d repeat: %d\n", length_codes[i-1].length, length);
 			for (int j=0; j<length; j++) {
 				length_codes[i+j].length = length_codes[i-1].length;
@@ -135,8 +148,14 @@ void read_length_codes(struct huff_node code_length_codes[], struct huff_node le
 void read_dynamic_huffman()
 {
 	int literal_length_code_count = get_bits(5) + 257;
+	write_byte(literal_length_code_count - 257);
+
 	int distance_code_count = get_bits(5) + 1;
+	write_byte(distance_code_count - 1);
+
 	int code_length_code_count = get_bits(4) + 4;
+	write_byte(code_length_code_count - 4);
+
 	struct huff_node code_length_codes[19] = {};
 	int code_length_code_order[19] = {
 		16, 17, 18,
@@ -144,8 +163,11 @@ void read_dynamic_huffman()
 	printf("dh %d %d %d\n", literal_length_code_count, distance_code_count, code_length_code_count);
 	for (int i=0; i<code_length_code_count; i++) {
 		code_length_codes[code_length_code_order[i]].length = get_bits(3);
+		write_byte(code_length_codes[code_length_code_order[i]].length);
 		printf("%d -> %d\n", code_length_code_order[i], code_length_codes[code_length_code_order[i]].length);
 	}
+
+	// we need to output the huffman tables in the compact form because they are not canonical
 	build_huff(code_length_codes, 19, 7);
 
 	printf("position %d\n", bit_position);
@@ -158,7 +180,7 @@ void read_dynamic_huffman()
 	read_length_codes(code_length_codes, distance_codes, distance_code_count);
 	build_huff(distance_codes, distance_code_count, 55);
 
-	char buf[1000];
+	char buf[100000];
 	int buf_index = 0;
 	while (1) {
 	int code = read_huff(literal_length_codes, literal_length_code_count);
@@ -169,6 +191,7 @@ void read_dynamic_huffman()
 			0, //259
 			0, //260
 			0, //261
+			0, //262
 			0, //263
 			0, //264
 			1, //265
@@ -226,11 +249,15 @@ void read_dynamic_huffman()
 				13};
 		if (code < 256) {
 			printf("%c", code);
+			char zero = 0;
+			fwrite(&zero, 1,1,df);
 			buf[buf_index++] = code;
 		}
-		else if (code == 256)
+		else if (code == 256) {
+			unsigned short dout = 32769;
+			fwrite(&dout, 1,2, df);
 			break;
-		else {
+		} else {
 			int lengths[] = {3,4,5,6,7,8,9,10,11,13,
 				15,17,19,23,27,31,35,43,51,59,
 				67,83,99,115,131,163,195,227,258};
@@ -241,23 +268,29 @@ void read_dynamic_huffman()
 			int extra_length = get_bits(extra_length_bits[code-257]);
 			int distance_code = read_huff(distance_codes, distance_code_count);
 			int extra_distance = get_bits(extra_distance_bits[distance_code]);
+			//printf("MMM: %d %d\n", code-257, extra_length_bits[code-257]);
+			//printf("LLL: %d %d\n", distance_code, extra_distance_bits[distance_code]);
 			//printf("length code: %d extra: %d:%d distance: %d extra:%d\n",
 			//       code, extra_length,
 			//       distance_code, extra_distance);
-			//printf("match %d %d\n", lengths[code-257] + extra_length,
-			//       distance[distance_code] + extra_distance);
+			//printf("\nmatch %d %d\n", lengths[code-257] + extra_length,
+			//      distance[distance_code] + extra_distance);
 			int l = lengths[code-257] + extra_length;
 			int d = distance[distance_code] + extra_distance;
 			for (int i=0; i<l; i++) {
 				char c = buf[buf_index-d];
 				buf[buf_index++] = c;
 				printf("%c",c);
+				fflush(stdout);
 			}
-
-
+			unsigned char lout = l - 3;
+			unsigned short dout = d;
+			fwrite(&dout, 1,2, df);
+			fwrite(&lout, 1,1, df);
 		}
 	}
 	}
+	fclose(df);
 	//struct huff_node example_lengths[] = {{3},{3},{3},{3},{3},{2},{4},{4}};
 	//build_huff(example_lengths, 8, 4);
 }
@@ -266,6 +299,7 @@ void read_deflate()
 	bool bfinal = get_bits(1);
 	uint8_t btype = get_bits(2);
 	printf("%x %x\n", bfinal, btype);
+	fwrite(&btype, 1,1, df);
 	if (btype == 2)
 		read_dynamic_huffman();
 }
@@ -273,6 +307,7 @@ void read_deflate()
 int main(int argc, char **argv)
 {
 	FILE *f = fopen(argv[1], "r");
+	df = fopen("decisions", "w+");
 	fseek(f, 0, SEEK_END);
 	long size = ftell(f);
 	fseek(f, 0, SEEK_SET);
