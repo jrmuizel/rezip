@@ -1,2 +1,2 @@
 CXXFLAGS=-Wall -g
-gzip:
+all: rezip gzip
