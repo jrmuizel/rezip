@@ -1,0 +1,2 @@
+./gzip $1 > /tmp/a
+cat decisions /tmp/a > $1.rez
