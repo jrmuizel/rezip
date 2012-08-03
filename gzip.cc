@@ -104,6 +104,13 @@ void write_byte(uint8_t a)
 	fwrite(&a, 1, 1, df);
 }
 
+void write_uint32(uint32_t a)
+{
+	fwrite(&a, 4, 1, df);
+}
+
+
+
 
 // the maximum length out of this is 15. The maximum huffcode is 18 We'll need to encode each of these as a byte
 // instead of a nibble (plus an additional byte for the extra bits)
@@ -319,15 +326,20 @@ int main(int argc, char **argv)
 	fseek(f, 0, SEEK_SET);
 	buf = (unsigned char*)malloc(size);
 	fread(buf, 1,size, f);
-	get_byte();
-	get_byte();
+	write_byte(get_byte());
+	write_byte(get_byte());
 	int cm = get_byte();
+	write_byte(cm);
 	uint8_t flg = get_byte();
+	write_byte(flg);
 	uint32_t mtime = get_uint32();
+
 	bool fname = flg & (1<<3);
 	bool fextra = flg & (1<<2);
 	uint8_t xfl = get_byte();
+	write_byte(xfl);
 	uint8_t os = get_byte();
+	write_byte(os);
 	//printf("%x, %x, %x\n",flg,  xfl, os);
 	if (fextra) {
 		printf("extra\n");
@@ -336,9 +348,12 @@ int main(int argc, char **argv)
 		uint8_t c;
 		do {
 			c = get_byte();
+			write_byte(c);
 		} while (c);
 	}
 	read_deflate();
 	uint32_t crc32 = get_uint32();
+	write_uint32(crc32);
 	uint32_t isize = get_uint32();
+	write_uint32(isize);
 }
