@@ -57,7 +57,7 @@ void build_huff(struct huff_node tree[], int code_length_count, int max_length)
 	for (int bits = 1; bits <= max_length; bits++) {
 		code = (code + bl_count[bits-1]) << 1;
 		next_code[bits] = code;
-		printf("length: %d next_code: %x\n", bits, code);
+		//printf("length: %d next_code: %x\n", bits, code);
 	}
 
 	int max_code = code_length_count-1;
@@ -67,7 +67,7 @@ void build_huff(struct huff_node tree[], int code_length_count, int max_length)
 			tree[n].code = next_code[len];
 			next_code[len]++;
 		}
-		printf("%d %d %x\n", n, tree[n].length, tree[n].code);
+		//printf("%d %d %x\n", n, tree[n].length, tree[n].code);
 	}
 
 }
@@ -115,7 +115,7 @@ void read_length_codes(struct huff_node code_length_codes[], struct huff_node le
 		if (code == 17) {
 			int length = get_bits(3) + 3;
 			write_byte(length-3);
-			printf("0 repeat: %d\n", length);
+			//printf("0 repeat: %d\n", length);
 			for (int j=0; j<length; j++) {
 				length_codes[i+j].length = 0;
 				length_codes[i+j].code = 0;
@@ -124,7 +124,7 @@ void read_length_codes(struct huff_node code_length_codes[], struct huff_node le
 		} else if (code == 18) {
 			int length = get_bits(7) + 11;
 			write_byte(length-11);
-			printf("0 repeat: %d\n", length);
+			//printf("0 repeat: %d\n", length);
 			for (int j=0; j<length; j++) {
 				length_codes[i+j].length = 0;
 				length_codes[i+j].code = 0;
@@ -133,7 +133,7 @@ void read_length_codes(struct huff_node code_length_codes[], struct huff_node le
 		} else if (code == 16) {
 			int length = get_bits(2) + 3;
 			write_byte(length-3);
-			printf("%d repeat: %d\n", length_codes[i-1].length, length);
+			//printf("%d repeat: %d\n", length_codes[i-1].length, length);
 			for (int j=0; j<length; j++) {
 				length_codes[i+j].length = length_codes[i-1].length;
 				length_codes[i+j].code = 0;
@@ -142,7 +142,7 @@ void read_length_codes(struct huff_node code_length_codes[], struct huff_node le
 		} else {
 			length_codes[i].length = code;
 			length_codes[i].code = 0;
-			printf("lit: %d[%c] %d\n", i, i, code);
+			//printf("lit: %d[%c] %d\n", i, i, code);
 		}
 	}
 
@@ -162,17 +162,17 @@ void read_dynamic_huffman()
 	int code_length_code_order[19] = {
 		16, 17, 18,
 		0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
-	printf("dh %d %d %d\n", literal_length_code_count, distance_code_count, code_length_code_count);
+	//printf("dh %d %d %d\n", literal_length_code_count, distance_code_count, code_length_code_count);
 	for (int i=0; i<code_length_code_count; i++) {
 		code_length_codes[code_length_code_order[i]].length = get_bits(3);
 		write_byte(code_length_codes[code_length_code_order[i]].length);
-		printf("%d -> %d\n", code_length_code_order[i], code_length_codes[code_length_code_order[i]].length);
+		//printf("%d -> %d\n", code_length_code_order[i], code_length_codes[code_length_code_order[i]].length);
 	}
 
 	// we need to output the huffman tables in the compact form because they are not canonical
 	build_huff(code_length_codes, 19, 7);
 
-	printf("position %d\n", bit_position);
+	//printf("position %d\n", bit_position);
 	struct huff_node literal_length_codes[literal_length_code_count];
 	read_length_codes(code_length_codes, literal_length_codes, literal_length_code_count);
 	//XXX: get real max
@@ -300,8 +300,9 @@ void read_deflate()
 	do {
 	bfinal = get_bits(1);
 	uint8_t btype = get_bits(2);
-	printf("%x %x\n", bfinal, btype);
-	fwrite(&btype, 1,1, df);
+	//printf("%x %x\n", bfinal, btype);
+	write_byte(bfinal);
+	write_byte(btype);
 	if (btype == 2)
 		read_dynamic_huffman();
 	else
@@ -318,7 +319,8 @@ int main(int argc, char **argv)
 	fseek(f, 0, SEEK_SET);
 	buf = (unsigned char*)malloc(size);
 	fread(buf, 1,size, f);
-	printf("%x %x\n", get_byte(), get_byte());
+	get_byte();
+	get_byte();
 	int cm = get_byte();
 	uint8_t flg = get_byte();
 	uint32_t mtime = get_uint32();
@@ -326,7 +328,7 @@ int main(int argc, char **argv)
 	bool fextra = flg & (1<<2);
 	uint8_t xfl = get_byte();
 	uint8_t os = get_byte();
-	printf("%x, %x, %x\n",flg,  xfl, os);
+	//printf("%x, %x, %x\n",flg,  xfl, os);
 	if (fextra) {
 		printf("extra\n");
 	}
