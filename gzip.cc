@@ -7,6 +7,8 @@ FILE *df;
 
 unsigned bit_position;
 unsigned char *buf;
+char obuf[1000000];
+int buf_index = 0;
 
 unsigned int get_bits(int k)
 {
@@ -180,8 +182,6 @@ void read_dynamic_huffman()
 	read_length_codes(code_length_codes, distance_codes, distance_code_count);
 	build_huff(distance_codes, distance_code_count, 55);
 
-	char buf[100000];
-	int buf_index = 0;
 	while (1) {
 	int code = read_huff(literal_length_codes, literal_length_code_count);
 	{
@@ -251,7 +251,7 @@ void read_dynamic_huffman()
 			printf("%c", code);
 			char zero = 0;
 			fwrite(&zero, 1,1,df);
-			buf[buf_index++] = code;
+			obuf[buf_index++] = code;
 		}
 		else if (code == 256) {
 			unsigned short dout = 32769;
@@ -264,7 +264,7 @@ void read_dynamic_huffman()
 			int distance[] = {1,2,3,4,5,7,9,13,17,25,
 				33,49,65,97,129,193,257,385,513,
 				769,1025,1537,2049,3073,4097,6145,
-				8193,12289,16384,24577};
+				8193,12289,16385,24577};
 			int extra_length = get_bits(extra_length_bits[code-257]);
 			int distance_code = read_huff(distance_codes, distance_code_count);
 			int extra_distance = get_bits(extra_distance_bits[distance_code]);
@@ -278,8 +278,8 @@ void read_dynamic_huffman()
 			int l = lengths[code-257] + extra_length;
 			int d = distance[distance_code] + extra_distance;
 			for (int i=0; i<l; i++) {
-				char c = buf[buf_index-d];
-				buf[buf_index++] = c;
+				char c = obuf[buf_index-d];
+				obuf[buf_index++] = c;
 				printf("%c",c);
 				fflush(stdout);
 			}
@@ -296,12 +296,17 @@ void read_dynamic_huffman()
 }
 void read_deflate()
 {
-	bool bfinal = get_bits(1);
+	bool bfinal;
+	do {
+	bfinal = get_bits(1);
 	uint8_t btype = get_bits(2);
 	printf("%x %x\n", bfinal, btype);
 	fwrite(&btype, 1,1, df);
 	if (btype == 2)
 		read_dynamic_huffman();
+	else
+		abort();
+	} while (!bfinal);
 }
 
 int main(int argc, char **argv)
