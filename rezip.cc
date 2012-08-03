@@ -34,7 +34,7 @@ int main(int argc, char **argv)
 			write_byte(c);
 		} while (c);
 	}
-	read_deflate();
+	write_deflate();
 	uint32_t crc32 = get_uint32();
 	write_uint32(crc32);
 	uint32_t isize = get_uint32();

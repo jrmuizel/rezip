@@ -8,6 +8,7 @@ FILE *df;
 unsigned bit_position;
 unsigned char *buf;
 char obuf[1000000];
+char outbuf[1000000];
 int buf_index = 0;
 
 unsigned int get_bits(int k)
@@ -25,6 +26,23 @@ unsigned int get_bits(int k)
 	}
 	return ret;
 }
+
+unsigned int put_bits(unsigned int value, int k)
+{
+	unsigned int ret = 0;
+	int count = 0;
+	while (k > 0)
+	{
+		unsigned int bit = value & 1;
+		outbuf[bit_position / 8] |= (bit << ((bit_position%8)));
+		value >>= 1;
+		bit_position+=1;
+		k--;
+	}
+	return ret;
+}
+
+
 
 unsigned int get_byte()
 {
@@ -154,6 +172,7 @@ void read_length_codes(struct huff_node code_length_codes[], struct huff_node le
 	}
 
 }
+
 void read_dynamic_huffman()
 {
 	int literal_length_code_count = get_bits(5) + 257;
@@ -301,6 +320,23 @@ void read_dynamic_huffman()
 	//struct huff_node example_lengths[] = {{3},{3},{3},{3},{3},{2},{4},{4}};
 	//build_huff(example_lengths, 8, 4);
 }
+
+void write_deflate()
+{
+	bool bfinal;
+	do {
+	bfinal = get_byte();
+	put_bits(bfinal, 1);
+	uint8_t btype = get_byte();
+	put_bits(btype, 2);
+	//printf("%x %x\n", bfinal, btype);
+	if (btype == 2)
+		;//write_dynamic_huffman();
+	else
+		abort();
+	} while (!bfinal);
+}
+
 void read_deflate()
 {
 	bool bfinal;
