@@ -16,6 +16,7 @@ int main(int argc, char **argv)
 	uint8_t flg = get_byte();
 	write_byte(flg);
 	uint32_t mtime = get_uint32();
+	write_uint32(mtime);
 
 	bool fname = flg & (1<<3);
 	bool fextra = flg & (1<<2);
@@ -23,7 +24,7 @@ int main(int argc, char **argv)
 	write_byte(xfl);
 	uint8_t os = get_byte();
 	write_byte(os);
-	//printf("%x, %x, %x\n",flg,  xfl, os);
+	printf("%x, %x, %x\n",flg,  xfl, os);
 	if (fextra) {
 		printf("extra\n");
 	}
@@ -39,4 +40,5 @@ int main(int argc, char **argv)
 	write_uint32(crc32);
 	uint32_t isize = get_uint32();
 	write_uint32(isize);
+	fclose(df);
 }
