@@ -1,14 +1,23 @@
 #include "rezip.h"
 
-int main(int argc, char **argv)
+unsigned char *read_file(const char *name)
 {
-	FILE *f = fopen(argv[1], "r");
-	df = fopen("result", "w+");
+	unsigned char *buf;
+	FILE *f = fopen(name, "r");
 	fseek(f, 0, SEEK_END);
 	long size = ftell(f);
 	fseek(f, 0, SEEK_SET);
 	buf = (unsigned char*)malloc(size);
 	fread(buf, 1,size, f);
+	return buf;
+}
+
+int main(int argc, char **argv)
+{
+	df = fopen("result", "w+");
+	buf = read_file(argv[1]);
+	literal_buf = read_file(argv[2]);
+	
 	put_byte(get_byte());
 	put_byte(get_byte());
 	int cm = get_byte();
@@ -37,9 +46,9 @@ int main(int argc, char **argv)
 	}
 	write_deflate();
 	uint32_t crc32 = get_uint32();
-	//put_uint32(crc32);
+	put_uint32(crc32);
 	uint32_t isize = get_uint32();
-	//put_uint32(isize);
+	put_uint32(isize);
 	fwrite(outbuf, out_bit_position / 8, 1, df);
 	fclose(df);
 }

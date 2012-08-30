@@ -31,7 +31,6 @@ unsigned int get_bits(int k)
 unsigned int put_bits(unsigned int value, int k)
 {
 	unsigned int ret = 0;
-	int count = 0;
 	while (k > 0)
 	{
 		unsigned int bit = value & 1;
@@ -249,6 +248,165 @@ void write_length_codes(struct huff_node code_length_codes[], struct huff_node l
 }
 
 
+unsigned char* literal_buf;
+int literal_index;
+
+int get_literal()
+{
+	return literal_buf[literal_index++];
+}
+
+void skip_literal(int amount)
+{
+	literal_index += amount;
+}
+
+//WIP
+void encode_stream(
+	struct huff_node literal_length_codes[], int literal_length_code_count,
+	struct huff_node distance_codes[], int distance_code_count)
+{
+	while (1) {
+	int code = get_byte();
+	printf("code: %x\n", code);
+	{
+		int extra_length_bits[] = {
+			0, //257
+			0, //258
+			0, //259
+			0, //260
+			0, //261
+			0, //262
+			0, //263
+			0, //264
+			1, //265
+			1, //266
+			1, //267
+			1, //268
+			2, //269
+			2, //270
+			2, //271
+			2, //272
+			3, //273
+			3, //274
+			3, //275
+			3, //276
+			4, //277
+			4, //278
+			4, //279
+			4, //280
+			5, //281
+			5, //282
+			5, //283
+			5, //284
+			0, //285
+		};
+		// min((a - 2)/2, 0)
+		int extra_distance_bits[] = {
+			0, 0, 0, 0,
+			1, 1,
+			2, 2,
+			3, 3,
+			4, 4,
+			5, 5,
+			6, 6,
+			7, 7,
+			8, 8,
+			9, 9,
+			10, 10,
+			11, 11,
+			12, 12,
+			13, 13};
+		if (code == 0) {
+			int literal = get_literal();
+			printf("lit: %c\n", literal);
+			write_huff(literal_length_codes, literal_length_code_count, literal);
+		}
+		else {
+			int bottom = code;
+			int top = get_byte();
+			code = top << 8 | bottom;
+
+			if (code == 32769) {
+				write_huff(literal_length_codes, literal_length_code_count, 256);
+				break;
+			} else {
+				int distance = code;
+				int length = get_byte() + 3;
+				printf("length %d distance %d\n", length, distance);
+				int lengths[] = {3,4,5,6,7,8,9,10,11,13,
+					15,17,19,23,27,31,35,43,51,59,
+					67,83,99,115,131,163,195,227,258};
+				int distances[] = {1,2,3,4,5,7,9,13,17,25,
+					33,49,65,97,129,193,257,385,513,
+					769,1025,1537,2049,3073,4097,6145,
+					8193,12289,16385,24577};
+
+				int extra_length;
+				int extra_length_bit_length;
+				int length_code;
+				// need to reduce the length to a code and extra bits
+				for (size_t i=0; i<sizeof(lengths)/sizeof(lengths[0]); i++) {
+					if (length < lengths[i]) {
+						assert(i > 0);
+						extra_length = length - lengths[i-1];
+						extra_length_bit_length = extra_length_bits[i-1];
+						length_code = 257 + i - 1;
+						break;
+					}
+				}
+
+				skip_literal(length);
+				write_huff(literal_length_codes, literal_length_code_count, length_code);
+				put_bits(extra_length, extra_length_bit_length);
+
+				int extra_distance;
+				int extra_distance_bit_length;
+				int distance_code;
+				for (size_t i=0; i<sizeof(distances)/sizeof(distances[0]); i++) {
+					if (distance < distances[i]) {
+						extra_distance = distance - distances[i-1];
+						extra_distance_bit_length = extra_distance_bits[i-1];
+						distance_code = i-1;
+						break;
+					}
+				}
+				write_huff(distance_codes, distance_code_count, distance_code);
+				put_bits(extra_distance, extra_distance_bit_length);
+
+#if 0
+				int lengths_minus_3[] = {0,1,2,3,4,5,6,7,8,10,
+					12,14,16,20,24,28,32,40,48,56,
+					64,80,96,112,128,160,192,224,255};
+				int extra_length = get_bits(extra_length_bits[code-257]);
+				int distance_code = read_huff(distance_codes, distance_code_count);
+				int extra_distance = get_bits(extra_distance_bits[distance_code]);
+				//printf("MMM: %d %d\n", code-257, extra_length_bits[code-257]);
+				//printf("LLL: %d %d\n", distance_code, extra_distance_bits[distance_code]);
+				//printf("length code: %d extra: %d:%d distance: %d extra:%d\n",
+				//       code, extra_length,
+				//       distance_code, extra_distance);
+				//printf("\nmatch %d %d\n", lengths[code-257] + extra_length,
+				//      distance[distance_code] + extra_distance);
+				int l = lengths[code-257] + extra_length;
+				int d = distance[distance_code] + extra_distance;
+				for (int i=0; i<l; i++) {
+					char c = obuf[buf_index-d];
+					obuf[buf_index++] = c;
+					printf("%c",c);
+					fflush(stdout);
+				}
+				unsigned char lout = l - 3;
+				unsigned short dout = d;
+				fwrite(&dout, 1,2, df);
+				fwrite(&lout, 1,1, df);
+#endif
+			}
+		}
+	}
+	}
+}
+
 void decode_stream(
 	struct huff_node literal_length_codes[], int literal_length_code_count,
 	struct huff_node distance_codes[], int distance_code_count)
@@ -287,37 +445,22 @@ void decode_stream(
 			5, //284
 			0, //285
 		};
+		// min((a - 2)/2, 0)
 		int extra_distance_bits[] = {
-			0,
-				0,
-				0,
-				0,
-				1,
-				1,
-				2,
-				2,
-				3,
-				3,
-				4,
-				4,
-				5,
-				5,
-				6,
-				6,
-				7,
-				7,
-				8,
-				8,
-				9,
-				9,
-				10,
-				10,
-				11,
-				11,
-				12,
-				12,
-				13,
-				13};
+			0, 0, 0, 0,
+			1, 1,
+			2, 2,
+			3, 3,
+			4, 4,
+			5, 5,
+			6, 6,
+			7, 7,
+			8, 8,
+			9, 9,
+			10, 10,
+			11, 11,
+			12, 12,
+			13, 13};
 		if (code < 256) {
 			printf("%c", code);
 			char zero = 0;
@@ -439,8 +582,7 @@ void write_dynamic_huffman()
 	write_length_codes(code_length_codes, distance_codes, distance_code_count);
 
 	build_huff(distance_codes, distance_code_count, 55);
-	return;
-	decode_stream(literal_length_codes, literal_length_code_count,
+	encode_stream(literal_length_codes, literal_length_code_count,
 		      distance_codes, distance_code_count);
 	//struct huff_node example_lengths[] = {{3},{3},{3},{3},{3},{2},{4},{4}};
 	//build_huff(example_lengths, 8, 4);

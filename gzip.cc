@@ -39,6 +39,7 @@ int main(int argc, char **argv)
 	uint32_t crc32 = get_uint32();
 	write_uint32(crc32);
 	uint32_t isize = get_uint32();
+	printf("size: %x\n", isize);
 	write_uint32(isize);
 	fclose(df);
 }
