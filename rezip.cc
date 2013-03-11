@@ -49,6 +49,6 @@ int main(int argc, char **argv)
 	put_uint32(crc32);
 	uint32_t isize = get_uint32();
 	put_uint32(isize);
-	fwrite(outbuf, out_bit_position / 8, 1, df);
+	fwrite(outbuf, (out_bit_position + 7)/ 8, 1, df);
 	fclose(df);
 }
