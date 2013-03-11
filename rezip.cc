@@ -17,7 +17,7 @@ int main(int argc, char **argv)
 	df = fopen("result", "w+");
 	buf = read_file(argv[1]);
 	literal_buf = read_file(argv[2]);
-	
+
 	put_byte(get_byte());
 	put_byte(get_byte());
 	int cm = get_byte();

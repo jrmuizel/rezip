@@ -323,15 +323,16 @@ void encode_stream(
 			write_huff(literal_length_codes, literal_length_code_count, literal);
 		}
 		else {
-			int bottom = code;
-			int top = get_byte();
+			int top = code;
+			int bottom = get_byte();
+			printf("bottom: %x\n", bottom);
 			code = top << 8 | bottom;
 
-			if (code == 32769) {
+			if (code == (32769 + 0x100)) {
 				write_huff(literal_length_codes, literal_length_code_count, 256);
 				break;
 			} else {
-				int distance = code;
+				int distance = code- 0x100;
 				int length = get_byte() + 3;
 				printf("length %d distance %d\n", length, distance);
 				int lengths[] = {3,4,5,6,7,8,9,10,11,13,
@@ -357,6 +358,7 @@ void encode_stream(
 				}
 
 				skip_literal(length);
+				printf("write_hufff: %d %d\n", literal_length_code_count, length_code);
 				write_huff(literal_length_codes, literal_length_code_count, length_code);
 				put_bits(extra_length, extra_length_bit_length);
 
@@ -413,6 +415,7 @@ void decode_stream(
 {
 	while (1) {
 	int code = read_huff(literal_length_codes, literal_length_code_count);
+	printf("code: %x %x\n", code, literal_length_code_count);
 	{
 		int extra_length_bits[] = {
 			0, //257
@@ -468,8 +471,11 @@ void decode_stream(
 			obuf[buf_index++] = code;
 		}
 		else if (code == 256) {
-			unsigned short dout = 32769;
-			fwrite(&dout, 1,2, df);
+			unsigned short dout = 32769+0x100;
+			unsigned char top = dout >> 8;
+			unsigned char bottom = dout & 0xff;
+			fwrite(&top, 1,1, df);
+			fwrite(&bottom, 1,1, df);
 			break;
 		} else {
 			int lengths[] = {3,4,5,6,7,8,9,10,11,13,
@@ -487,19 +493,23 @@ void decode_stream(
 			//printf("length code: %d extra: %d:%d distance: %d extra:%d\n",
 			//       code, extra_length,
 			//       distance_code, extra_distance);
-			//printf("\nmatch %d %d\n", lengths[code-257] + extra_length,
-			//      distance[distance_code] + extra_distance);
+			printf("\nmatch %d %d\n", lengths[code-257] + extra_length,
+			      distance[distance_code] + extra_distance);
 			int l = lengths[code-257] + extra_length;
 			int d = distance[distance_code] + extra_distance;
 			for (int i=0; i<l; i++) {
 				char c = obuf[buf_index-d];
 				obuf[buf_index++] = c;
-				printf("%c",c);
+				//printf("%c",c);
 				fflush(stdout);
 			}
 			unsigned char lout = l - 3;
-			unsigned short dout = d;
-			fwrite(&dout, 1,2, df);
+			unsigned short dout = d + 0x100;
+			unsigned char dout_top = dout >> 8;
+			unsigned char dout_bottom = dout &0xff;
+			printf("%x(%x, %x) %x\n", dout, dout_top, dout_bottom, lout);
+			fwrite(&dout_top, 1,1, df);
+			fwrite(&dout_bottom, 1,1, df);
 			fwrite(&lout, 1,1, df);
 		}
 	}
@@ -508,6 +518,7 @@ void decode_stream(
 void read_dynamic_huffman()
 {
 	int literal_length_code_count = get_bits(5) + 257;
+	printf("literal_length_code_count: %x\n", literal_length_code_count);
 	write_byte(literal_length_code_count - 257);
 
 	int distance_code_count = get_bits(5) + 1;
@@ -548,8 +559,10 @@ void read_dynamic_huffman()
 
 void write_dynamic_huffman()
 {
+	printf("start dyn huff block\n");
 	int literal_length_code_count = get_byte() + 257;
 	put_bits(literal_length_code_count - 257, 5);
+	printf("length_code_count: %x\n", literal_length_code_count);
 
 	int distance_code_count = get_byte() + 1;
 	put_bits(distance_code_count - 1, 5);
