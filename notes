@@ -1,0 +1,27 @@
+infgen
+
+current stream format:
+0: literal:
+1-0x80: a 2 byte value that is either a distance or stop code
+        if it's a length we also read a byte of length
+
+possible format:
+0: 1 literal byte
+1-0x80: a 2 byte value that is a distance
+0x81-0xfe: we can distribute these for shorter distances and runs of literals
+
+it would be interesting to experiment with not outputing the full file
+and instead just outputing in place. here's a possible format:
+0: 1 literal byte follows
+1-0x80: a 2 byte value that is a distance
+0x81-0xfe: 2-n literal bytes follow
+
+we could also copy the encoding that snappy uses as we're doing
+basically the same thing
+
+More efficient encoding:
+ - one thing we can do to simply decrease the entropy is to encode the match
+   number instead of the match offset. If we keep the existing length, this
+   should often identify the match with a low number. In fact, the match
+   should nearly always be the first one, because a latter one should
+   nearly always be more expensive to encode.

@@ -1,0 +1,9 @@
+Early results:
+Differencing browser.js from Firefox 12 and 13
+
+source             bsdiff size
+ browser.js            4195
+ browser.js.gz       108696
+ browser.js.rez       33089
+ browser.js.snz       45622
+ browser.js.lz4       45101
