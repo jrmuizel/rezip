@@ -504,6 +504,10 @@ void decode_stream(
 				fflush(stdout);
 			}
 			unsigned char lout = l - 3;
+			// match number: instead of outputing the distance we can output
+			// the match number to do so we need to search forward to see how
+			// many matches we have skipped which means we need to keep the
+			// output buffer
 			unsigned short dout = d + 0x100;
 			unsigned char dout_top = dout >> 8;
 			unsigned char dout_bottom = dout &0xff;
