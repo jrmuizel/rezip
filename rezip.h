@@ -5,6 +5,8 @@
 #include <assert.h>
 FILE *df;
 
+bool match_format = false;
+
 unsigned bit_position;
 unsigned out_bit_position;
 unsigned char *buf;
@@ -503,11 +505,31 @@ void decode_stream(
 				//printf("%c",c);
 				fflush(stdout);
 			}
+			int match_count = 0;
+			char *match_start = &obuf[buf_index-l];
+			char *match_end = &obuf[buf_index];
+			char *distance_start = &obuf[buf_index-l-d];
+			while (distance_start < match_start) {
+				int i;
+				for (i = 0; i < l; i++) {
+					if (distance_start[i] != match_start[i])
+						break;
+				}
+				if (i == l) {
+					match_count++;
+				}
+				distance_start++;
+			}
+			printf("match count: %d\n", match_count);
+			// find the number for times that obuf[(buf_index-d)..(buf_index-d+l)]
+			// occurs in the string obuf[buf_index-d..buf_index]
 			unsigned char lout = l - 3;
 			// match number: instead of outputing the distance we can output
 			// the match number to do so we need to search forward to see how
 			// many matches we have skipped which means we need to keep the
 			// output buffer
+			if (match_format)
+				d = match_count;
 			unsigned short dout = d + 0x100;
 			unsigned char dout_top = dout >> 8;
 			unsigned char dout_bottom = dout &0xff;
