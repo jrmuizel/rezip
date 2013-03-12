@@ -5,7 +5,7 @@
 #include <assert.h>
 FILE *df;
 
-bool match_format = false;
+bool match_format = true;
 
 unsigned bit_position;
 unsigned out_bit_position;
@@ -335,8 +335,35 @@ void encode_stream(
 				break;
 			} else {
 				int distance = code- 0x100;
+				int computed_distance = 0;
 				int length = get_byte() + 3;
-				printf("length %d distance %d\n", length, distance);
+				unsigned char *end = &literal_buf[literal_index+length-1];
+				unsigned char *possible_end = &literal_buf[literal_index+length-2];
+				unsigned char *buf_end = &literal_buf[length];
+				int desired_match_count = 1;
+				if (match_format)
+					desired_match_count = code - 0x100;
+				int match_count = 0;
+				while (possible_end > buf_end) {
+					int i;
+					for (i=0; i<length; i++) {
+						if (possible_end[-i] != end[-i]) {
+							break;
+						}
+					}
+					if (i==length) {
+						match_count++;
+						computed_distance = (end - possible_end);
+						if (desired_match_count == match_count)
+							break;
+					}
+					possible_end--;
+				}
+
+				if (match_format)
+					distance = computed_distance;
+
+				printf("length %d distance %d computed_distance %d\n", length, distance, computed_distance);
 				int lengths[] = {3,4,5,6,7,8,9,10,11,13,
 					15,17,19,23,27,31,35,43,51,59,
 					67,83,99,115,131,163,195,227,258};

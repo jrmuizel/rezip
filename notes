@@ -25,3 +25,8 @@ More efficient encoding:
    should often identify the match with a low number. In fact, the match
    should nearly always be the first one, because a latter one should
    nearly always be more expensive to encode.
+   This did indeed cut the diff size by 3x
+ - We can perhaps do even better by counting match offsets and lengths.
+   This is significantly harder because we need to order these somehow
+   This will basically require a full lz matcher to implement efficiently.
+
