@@ -19,6 +19,28 @@ and instead just outputing in place. here's a possible format:
 we could also copy the encoding that snappy uses as we're doing
 basically the same thing
 
+lz4 format:
+
+token == > 4-high bits : literal length / 4-low-bits : match length
+
+token   | literal length + (optional) | literals | offset | match length + (optional)
+1 bytes        0-n bytes                0-L bytes  2-bytes       0-n bytes
+
+offset = 0-65535
+
+snappy format:
+
+2 bits
+00 = literal - 6 bits (len-1), up to 60
+     60 = 1 bytes of length
+     61 = 2 bytes
+     62 = 3 bytes
+     63 = 4 bytes 
+01 = copy with 1-byte offset, lengths (4..1) bytes, offset (0..2057)
+01 = copy with 2-byte offset, lengths (1..64) bytes, offsets (0..65535)
+01 = copy with 4-byte offset, lengths (1..64) bytes, offsets (0..2^32-1)
+
+
 More efficient encoding:
  - one thing we can do to simply decrease the entropy is to encode the match
    number instead of the match offset. If we keep the existing length, this
@@ -30,3 +52,13 @@ More efficient encoding:
    This is significantly harder because we need to order these somehow
    This will basically require a full lz matcher to implement efficiently.
 
+ Similar projects:
+  reflate http://encode.ru/threads/1399-reflate-a-new-universal-deflate-recompressor/page2
+
+Sliding window:
+ - it looks like lz4 doesn't really slide it just limits block sizes to
+   available memory?
+ - gzip: puff uses an in memory window
+         inflate.c uses logic and an occasional window update
+         inflate_fast seems to use logic to copy from a circular buffer
+         in pieces
