@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <string.h>
+
 FILE *df;
 
 bool match_format = true;
@@ -443,6 +445,11 @@ void decode_stream(
 	struct huff_node distance_codes[], int distance_code_count)
 {
 	while (1) {
+	if (buf_index > 64*1024) {
+		printf("adjusting window buffer\n");
+		memmove(obuf, obuf + buf_index - 32 * 1024, buf_index - 32 * 1024);
+		buf_index = 32 * 1024;
+	}
 	int code = read_huff(literal_length_codes, literal_length_code_count);
 	printf("code: %x %x\n", code, literal_length_code_count);
 	{
@@ -532,16 +539,21 @@ void decode_stream(
 				//printf("%c",c);
 				fflush(stdout);
 			}
+
+                        // Determine which match of length l we have encoded.
+                        // To do this we only need to check if there are matches
+                        // of the same length that are closer.
 			int match_count = 0;
-			char *match_start = &obuf[buf_index-l];
-			char *match_end = &obuf[buf_index];
-			char *distance_start = &obuf[buf_index-l-d];
+			char *match_start = &obuf[buf_index-l]; // the earliest place a match could start
+			char *match_end = &obuf[buf_index]; // the end of that same match
+			char *distance_start = &obuf[buf_index-l-d]; // the start of the actual match
 			while (distance_start < match_start) {
 				int i;
 				for (i = 0; i < l; i++) {
 					if (distance_start[i] != match_start[i])
 						break;
 				}
+                                // check if we've found a match
 				if (i == l) {
 					match_count++;
 				}
